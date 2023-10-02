@@ -65,15 +65,14 @@ class Poisson2D:
 
     def assemble(self):
         """Return assembled matrix A and right hand side vector b"""
-        x, y  = sp.symbols('x, y')
+        # x, y  = sp.symbols('x, y')
         F = sp.lambdify((x, y), self.f)(self.xij, self.yij)
         bnds = self.get_boundary_indices()
         b = F.ravel()
-        # print(F.shape)
-        # print(b.shape)
-        # print(bnds)
-        # exit()
-        b[bnds] = 0
+        
+        exact = self.eval(self.xij, self.yij)
+        exact = exact.ravel()
+        b[bnds] = exact[bnds]
 
         A = self.laplace()
         A = A.tolil()
@@ -88,9 +87,7 @@ class Poisson2D:
     def l2_error(self, u):
         """Return l2-error norm"""
         ue = self.eval(self.xij, self.yij)
-        # l2_err = np.sqrt(np.sum((u-ue)**2*self.h**2))
-        l2_err = np.sqrt(np.trapz(np.trapz((u)**2, dx=self.h, axis=1), dx=self.h))
-        # l2_err = np.sqrt(np.sum((u)**2*self.h**2))
+        l2_err = np.sqrt(np.trapz(np.trapz((u-ue)**2, dx=self.h, axis=1), dx=self.h))
         return l2_err
         # raise NotImplementedError
 
@@ -133,12 +130,13 @@ class Poisson2D:
         for m in range(m):
             u = self(N0)
             E.append(self.l2_error(u))
+            print(self.l2_error(u))
             h.append(self.h)
             N0 *= 2
         r = [np.log(E[i-1]/E[i])/np.log(h[i-1]/h[i]) for i in range(1, m+1, 1)]
         return r, np.array(E), np.array(h)
 
-    def eval(self, x, y):
+    def eval(self, xi, yi):
         """Return u(x, y)
 
         Parameters
@@ -151,8 +149,8 @@ class Poisson2D:
         The value of u(x, y)
 
         """
-        symx, symy  = sp.symbols('x, y')
-        return sp.lambdify((symx, symy), self.ue)(x, y)
+        # symx, symy  = sp.symbols('x, y')
+        return sp.lambdify((x, y), self.ue)(xi, yi)
         # raise NotImplementedError
 
 def test_convergence_poisson2d():
@@ -160,7 +158,7 @@ def test_convergence_poisson2d():
     ue = sp.exp(sp.cos(4*sp.pi*x)*sp.sin(2*sp.pi*y))
     sol = Poisson2D(1, ue)
     r, E, h = sol.convergence_rates()
-    print(r[-1])
+    print(r)
     assert abs(r[-1]-2) < 1e-2
 
 def test_interpolation():
