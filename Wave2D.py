@@ -29,11 +29,13 @@ class Wave2D:
     @property
     def w(self):
         """Return the dispersion coefficient"""
-        return 0.9
+        return 3
 
     def ue(self, mx, my):
         """Return the exact standing wave"""
         return sp.sin(mx*sp.pi*x)*sp.sin(my*sp.pi*y)*sp.cos(self.w*t)
+        # return sp.sin(my*sp.pi*y)*sp.sin(mx*sp.pi*x)*sp.cos(self.w*t*t)
+        # return sp.sin(mx*sp.pi*x)*sp.sin(my*sp.pi*y)*sp.cos(self.w*t)
 
     def initialize(self, N, mx, my):
         r"""Initialize the solution at $U^{n}$ and $U^{n-1}$
@@ -74,12 +76,12 @@ class Wave2D:
         raise NotImplementedError
 
     def apply_bcs(self):
-        self.Unp1[0, :] = sp.lambdify((y, t), self.ue(self.mx, self.my).subs({x:0}))(self.yij, self.ti)
-        self.Unp1[-1, :] = sp.lambdify((y, t), self.ue(self.mx, self.my).subs({x:self.N}))(self.yij, self.ti)
 
-        self.Unp1[:, 0] = sp.lambdify((x, t), self.ue(self.mx, self.my).subs({y:0}))(self.xij, self.ti)
-        self.Unp1[:, -1] = sp.lambdify((x, t), self.ue(self.mx, self.my).subs({y:self.N}))(self.xij, self.ti)
-        # raise NotImplementedError
+        ue = self.ue(self.mx, self.my)
+        self.Unp1[0, :] = sp.lambdify((y, t), ue.subs({x:0}))(self.yij, self.ti)
+        self.Unp1[-1, :] = sp.lambdify((y, t), ue.subs({x:1}))(self.yij, self.ti)
+        self.Unp1[:, 0] = sp.lambdify((x, t), ue.subs({y:0}))(self.xij, self.ti)
+        self.Unp1[:, -1] = sp.lambdify((x, t), ue.subs({y:1}))(self.xij, self.ti)
 
     def __call__(self, N, Nt, cfl=0.5, c=1.0, mx=3, my=3, store_data=-1):
         """Solve the wave equation
@@ -125,12 +127,12 @@ class Wave2D:
         self.plotdata[1]= self.Un.copy()
         for n in range(2, Nt+1):
             self.ti = n*dt
-            self.Unp1[:,:] = 2*self.Un - self.Unm1 + c**2 * (D2 @ self.Un)
+            self.Unp1[:,:] = 2*self.Un - self.Unm1 + 1000*(c*dt)**2 * (D2 @ self.Un + self.Un @ D2.T)
             self.apply_bcs()
             self.Unm1[:,:] = self.Un
             self.Un[:,:] = self.Unp1
-
-            self.plotdata[n]= self.Unm1.copy()
+            if n % 50 == 0:
+                self.plotdata[n]= self.Unm1.copy()
 
         if store_data <= 0:
             return self.h
@@ -152,8 +154,8 @@ class Wave2D:
             # frame = ax.plot_surface(self.xij, self.yij, val, cmap='jet')
 
             frames.append([frame])
-        ani = animation.ArtistAnimation(fig, frames, interval=10, blit=True,
-                                repeat_delay=1000)
+        ani = animation.ArtistAnimation(fig, frames, interval=1, blit=True,)
+                                # repeat_delay=1000)
         ani.save("wave2d.gif", writer='pillow')
         plt.show()
 
@@ -216,5 +218,5 @@ def test_exact_wave2d():
 
 if __name__ == '__main__':
     wave = Wave2D()
-    data = wave(200, 800, store_data=1)
+    data = wave(200, 20000, store_data=1)
     wave.animate()
