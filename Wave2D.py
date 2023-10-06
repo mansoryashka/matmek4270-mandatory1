@@ -3,6 +3,7 @@ import sympy as sp
 import scipy.sparse as sparse
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import matplotlib.animation as animation
 
 x, y, t = sp.symbols('x,y,t')
 
@@ -129,18 +130,32 @@ class Wave2D:
             self.Unm1[:,:] = self.Un
             self.Un[:,:] = self.Unp1
 
-            self.plotdata[n]= self.Unp1.copy()
-
-        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-        ax.plot_surface(self.xij, self.yij, self.Unp1)
-        plt.show()
+            self.plotdata[n]= self.Unm1.copy()
 
         if store_data <= 0:
             return self.h
         else:
+            print("storing")
             return self.plotdata
         
         # raise NotImplementedError
+
+    def animate(self):
+        frames = []
+
+        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        for t, val in self.plotdata.items():
+            # print(type(val))
+            # print(val.shape)
+            # exit()
+            frame = ax.plot_wireframe(self.xij, self.yij, val)
+            # frame = ax.plot_surface(self.xij, self.yij, val, cmap='jet')
+
+            frames.append([frame])
+        ani = animation.ArtistAnimation(fig, frames, interval=10, blit=True,
+                                repeat_delay=1000)
+        ani.save("wave2d.gif", writer='pillow')
+        plt.show()
 
     def convergence_rates(self, m=4, cfl=0.1, Nt=10, mx=3, my=3):
         """Compute convergence rates for a range of discretizations
@@ -201,4 +216,5 @@ def test_exact_wave2d():
 
 if __name__ == '__main__':
     wave = Wave2D()
-    wave(100, 20)
+    data = wave(200, 800, store_data=1)
+    wave.animate()
