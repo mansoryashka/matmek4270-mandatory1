@@ -65,7 +65,6 @@ class Poisson2D:
 
     def assemble(self):
         """Return assembled matrix A and right hand side vector b"""
-        # x, y  = sp.symbols('x, y')
         F = sp.lambdify((x, y), self.f)(self.xij, self.yij)
         bnds = self.get_boundary_indices()
         b = F.ravel()
@@ -130,7 +129,6 @@ class Poisson2D:
         for m in range(m):
             u = self(N0)
             E.append(self.l2_error(u))
-            print(self.l2_error(u))
             h.append(self.h)
             N0 *= 2
         r = [np.log(E[i-1]/E[i])/np.log(h[i-1]/h[i]) for i in range(1, m+1, 1)]
@@ -149,8 +147,8 @@ class Poisson2D:
         The value of u(x, y)
 
         """
-        # symx, symy  = sp.symbols('x, y')
-        return sp.lambdify((x, y), self.ue)(xi, yi)
+        self
+        return sp.lambdify((x, y), self.U)(xi, yi)
         # raise NotImplementedError
 
 def test_convergence_poisson2d():

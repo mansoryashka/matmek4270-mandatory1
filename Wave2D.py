@@ -10,17 +10,25 @@ class Wave2D:
 
     def create_mesh(self, N, sparse=False):
         """Create 2D mesh and store in self.xij and self.yij"""
-        # self.xji, self.yij = ...
-        raise NotImplementedError
+        X = np.linspace(0, 1, N+1)
+        Y = np.linspace(0, 1, N+1)
+        self.h = X[1] - X[0]
+        
+        self.xij, self.yij = np.meshgrid(X, Y, sparse=sparse)
+        # raise NotImplementedError
 
     def D2(self, N):
         """Return second order differentiation matrix"""
-        raise NotImplementedError
+        D2 = sparse.diags([1, -2, 1], [-1, 0, 1], (N+1, N+1), 'lil')
+        # D2[0, :4] = 2, -5, 4, -1
+        # D2[-1, -4:] = -1, 4, -5, 2
+        return D2
+        # raise NotImplementedError
 
     @property
     def w(self):
         """Return the dispersion coefficient"""
-        raise NotImplementedError
+        return 0.9
 
     def ue(self, mx, my):
         """Return the exact standing wave"""
@@ -36,12 +44,21 @@ class Wave2D:
         mx, my : int
             Parameters for the standing wave
         """
-        raise NotImplementedError
+        self.Unm1 = np.zeros((N+1,N+1))
+        self.Un = np.zeros((N+1,N+1))
+
+        u0 = sp.lambdify((x, y), self.ue(mx, my).subs({t:0}))
+        u1 = sp.lambdify((x, y), self.ue(mx, my).subs({t:self.dt}))
+
+        self.Unm1[:] = u0(self.xij, self.yij)
+        self.Un[:] = u1(self.xij, self.yij)
+        # raise NotImplementedError
 
     @property
     def dt(self):
         """Return the time step"""
-        raise NotImplementedError
+        return self.cfl * self.h / self.c
+        # raise NotImplementedError
 
     def l2_error(self, u, t0):
         """Return l2-error norm
@@ -56,7 +73,12 @@ class Wave2D:
         raise NotImplementedError
 
     def apply_bcs(self):
-        raise NotImplementedError
+        self.Unp1[0, :] = sp.lambdify((y, t), self.ue(self.mx, self.my).subs({x:0}))(self.yij, self.ti)
+        self.Unp1[-1, :] = sp.lambdify((y, t), self.ue(self.mx, self.my).subs({x:self.N}))(self.yij, self.ti)
+
+        self.Unp1[:, 0] = sp.lambdify((x, t), self.ue(self.mx, self.my).subs({y:0}))(self.xij, self.ti)
+        self.Unp1[:, -1] = sp.lambdify((x, t), self.ue(self.mx, self.my).subs({y:self.N}))(self.xij, self.ti)
+        # raise NotImplementedError
 
     def __call__(self, N, Nt, cfl=0.5, c=1.0, mx=3, my=3, store_data=-1):
         """Solve the wave equation
@@ -83,7 +105,42 @@ class Wave2D:
         If store_data > 0, then return a dictionary with key, value = timestep, solution
         If store_data == -1, then return the two-tuple (h, l2-error)
         """
-        raise NotImplementedError
+        self.N = N
+        self.Nt = Nt
+        self.c = c
+        self.cfl =cfl
+        self.mx = mx
+        self.my = my
+        self.Unp1 = np.zeros((N+1, N+1))
+        self.ti = 0
+        self.create_mesh(N)
+        self.initialize(N, mx, my)
+        D2 = self.D2(N)
+        dt = self.dt
+        # for i in range(1, Nt):
+            # self.ti = i*self.dt
+            # apply_bcs(self.ti)
+        self.plotdata = {0: self.Unm1.copy()}
+        self.plotdata[1]= self.Un.copy()
+        for n in range(2, Nt+1):
+            self.ti = n*dt
+            self.Unp1[:,:] = 2*self.Un - self.Unm1 + c**2 * (D2 @ self.Un)
+            self.apply_bcs()
+            self.Unm1[:,:] = self.Un
+            self.Un[:,:] = self.Unp1
+
+            self.plotdata[n]= self.Unp1.copy()
+
+        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        ax.plot_surface(self.xij, self.yij, self.Unp1)
+        plt.show()
+
+        if store_data <= 0:
+            return self.h
+        else:
+            return self.plotdata
+        
+        # raise NotImplementedError
 
     def convergence_rates(self, m=4, cfl=0.1, Nt=10, mx=3, my=3):
         """Compute convergence rates for a range of discretizations
@@ -141,3 +198,7 @@ def test_convergence_wave2d_neumann():
 
 def test_exact_wave2d():
     raise NotImplementedError
+
+if __name__ == '__main__':
+    wave = Wave2D()
+    wave(100, 20)
