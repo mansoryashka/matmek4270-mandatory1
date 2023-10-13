@@ -86,7 +86,10 @@ class Poisson2D:
     def l2_error(self, u):
         """Return l2-error norm"""
         ue = self.eval(self.xij, self.yij)
+        print(ue.shape)
+        print(u.shape)
         l2_err = np.sqrt(np.trapz(np.trapz((u-ue)**2, dx=self.h, axis=1), dx=self.h))
+        print(l2_err)
         return l2_err
         # raise NotImplementedError
 
@@ -147,8 +150,8 @@ class Poisson2D:
         The value of u(x, y)
 
         """
-        self
-        return sp.lambdify((x, y), self.U)(xi, yi)
+        # self
+        return sp.lambdify((x, y), self.ue)(xi, yi)
         # raise NotImplementedError
 
 def test_convergence_poisson2d():
