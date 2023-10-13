@@ -86,10 +86,7 @@ class Poisson2D:
     def l2_error(self, u):
         """Return l2-error norm"""
         ue = self.eval(self.xij, self.yij)
-        print(ue.shape)
-        print(u.shape)
         l2_err = np.sqrt(np.trapz(np.trapz((u-ue)**2, dx=self.h, axis=1), dx=self.h))
-        print(l2_err)
         return l2_err
         # raise NotImplementedError
 
@@ -152,14 +149,12 @@ class Poisson2D:
         """
         # self
         return sp.lambdify((x, y), self.ue)(xi, yi)
-        # raise NotImplementedError
 
 def test_convergence_poisson2d():
     # This exact solution is NOT zero on the entire boundary
     ue = sp.exp(sp.cos(4*sp.pi*x)*sp.sin(2*sp.pi*y))
     sol = Poisson2D(1, ue)
     r, E, h = sol.convergence_rates()
-    print(r)
     assert abs(r[-1]-2) < 1e-2
 
 def test_interpolation():
@@ -171,4 +166,4 @@ def test_interpolation():
 
 if __name__ == '__main__':
     test_convergence_poisson2d()
-    exit()
+    test_interpolation()

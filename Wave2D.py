@@ -20,14 +20,20 @@ class Wave2D:
     def D2(self, N):
         """Return second order differentiation matrix"""
         D2 = sparse.diags([1, -2, 1], [-1, 0, 1], (N+1, N+1), 'lil')
-        # D2[0, :4] = 2, -5, 4, -1
-        # D2[-1, -4:] = -1, 4, -5, 2
+
         return D2
 
     @property
     def w(self):
         """Return the dispersion coefficient"""
         w = self.c*np.pi*np.sqrt(self.mx**2 + self.my**2)
+        # print(self.c*np.pi*np.sqrt(self.mx**2 + self.my**2))
+
+        # kx = self.mx*np.pi
+        # ky = self.my*np.pi
+        # w = self.c*np.sqrt(kx**2 + ky**2)
+
+        # w = 1.443
         return w
     
     def ue(self, mx, my):
@@ -50,8 +56,8 @@ class Wave2D:
         u0 = sp.lambdify((x, y), self.ue(mx, my).subs({t:0}))
         u1 = sp.lambdify((x, y), self.ue(mx, my).subs({t:self.dt}))
 
-        self.Unm1 = u0(self.xij, self.yij)
-        self.Un = u1(self.xij, self.yij)
+        self.Unm1[:] = u0(self.xij, self.yij)
+        self.Un[:] = u1(self.xij, self.yij)
 
     @property
     def dt(self):
@@ -71,25 +77,16 @@ class Wave2D:
         ue = self.ue(self.mx, self.my)
         uet0 = sp.lambdify((x, y), ue.subs({t:t0}))(self.xij, self.yij)
 
-        # err = np.sqrt(np.trapz(np.trapz((u-uet0)**2, dx=self.h, axis=1), dx=self.h))
-        # err = np.sqrt(self.h**2*np.sum(np.sum((u - uet0)**2, axis=0)))
-        # err = np.sqrt(self.h**2*np.sum((u - uet0)**2))
-
-        err = np.sqrt(self.h**2*np.sum(np.sum((u - uet0)**2, axis=1)))
+        err = np.sqrt(self.h**2*np.sum((u[:] - uet0[:])**2))
 
         # print(f't: {t0:.3f}, error: {err:.3f}')
         return err
 
     def apply_bcs(self):
-        ue = self.ue(self.mx, self.my)
-        self.Unp1[0, :] = sp.lambdify((y, t), ue.subs({x:0}))(self.yij, self.ti)
-        self.Unp1[-1, :] = sp.lambdify((y, t), ue.subs({x:1}))(self.yij, self.ti)
-        self.Unp1[:, 0] = sp.lambdify((x, t), ue.subs({y:0}))(self.xij, self.ti)
-        self.Unp1[:, -1] = sp.lambdify((x, t), ue.subs({y:1}))(self.xij, self.ti)
-        # self.Unp1[0, :] = 0
-        # self.Unp1[-1, :] = 0
-        # self.Unp1[:, 0] = 0
-        # self.Unp1[:, -1] = 0
+        self.Unp1[0, :] = 0
+        self.Unp1[-1, :] = 0
+        self.Unp1[:, 0] = 0
+        self.Unp1[:, -1] = 0
 
     def __call__(self, N, Nt, cfl=0.5, c=1.0, mx=3, my=3, store_data=-1):
         """Solve the wave equation
@@ -130,17 +127,18 @@ class Wave2D:
         self.Unp1 = np.zeros((N+1, N+1))
         err = []
 
-        # self.Un[:] = self.Unm1[:] + (c*dt)**2 / 2 * (D2 @ self.Unm1[:] + self.Unm1[:] @ D2.T)
 
         self.plotdata = {0: self.Unm1.copy()}
         self.plotdata[1]= self.Un.copy()
-        for n in range(2, Nt+1):
+        for n in range(1, Nt+1):
             self.ti = n*dt
-            self.Unp1[:,:] = 2*self.Un[:,:] - self.Unm1[:,:] + (c*dt)**2 * (D2 @ self.Un[:,:] + self.Un[:,:] @ D2.T)
+            self.Unp1[:,:] = 2*self.Un - self.Unm1 + (c*dt)**2 * (D2 @ self.Un + self.Un @ D2.T)
             self.apply_bcs()
-            self.Unm1 = self.Un
-            self.Un = self.Unp1
-            err.append(self.l2_error(self.Unm1, self.ti))
+
+            self.Unm1[:] = self.Un
+            self.Un[:] = self.Unp1
+
+            err.append(self.l2_error(self.Unm1[:], self.ti))
             if n % store_data == 0:
                 self.plotdata[n]= self.Unm1.copy()
 
@@ -154,15 +152,15 @@ class Wave2D:
 
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         for t, val in self.plotdata.items():
-            frame = ax.plot_wireframe(self.xij, self.yij, val)
-            # frame = ax.plot_surface(self.xij, self.yij, val, cmap='jet')
+            # frame = ax.plot_wireframe(self.xij, self.yij, val)
+            frame = ax.plot_surface(self.xij, self.yij, val, cmap=cm.coolwarm)
 
             frames.append([frame])
-        ani = animation.ArtistAnimation(fig, frames, interval=1, blit=True,)
+        ani = animation.ArtistAnimation(fig, frames, interval=150, blit=True,)
         ani.save("wave2d.gif", writer='pillow')
         plt.show()
 
-    def convergence_rates(self, m=4, cfl=0.1, Nt=10, mx=3, my=3):
+    def convergence_rates(self, m=5, cfl=0.1, Nt=10, mx=3, my=3):
         """Compute convergence rates for a range of discretizations
 
         Parameters
@@ -199,13 +197,18 @@ class Wave2D:
 class Wave2D_Neumann(Wave2D):
 
     def D2(self, N):
-        raise NotImplementedError
+        """Return second order differentiation matrix"""
+        D2 = super().D2(N)
+        D2[0, :2] = -2, 2
+        D2[-1, -2:] = 2, -2
+        return D2
 
     def ue(self, mx, my):
-        raise NotImplementedError
+        """ Return the exact standing wave. """
+        return sp.cos(mx*sp.pi*x)*sp.cos(my*sp.pi*y)*sp.cos(self.w*t)
 
     def apply_bcs(self):
-        raise NotImplementedError
+        pass
 
 def test_convergence_wave2d():
     sol = Wave2D()
@@ -216,13 +219,23 @@ def test_convergence_wave2d():
 def test_convergence_wave2d_neumann():
     solN = Wave2D_Neumann()
     r, E, h = solN.convergence_rates(mx=2, my=3)
+    print(r)
+    print(E)
     assert abs(r[-1]-2) < 0.05
 
 def test_exact_wave2d():
-    raise NotImplementedError
+    sol_Dir = Wave2D()
+    sol_Neu = Wave2D_Neumann()
+    _, E_Dir, _ = sol_Dir.convergence_rates(cfl=1/np.sqrt(2), mx=3, my=3)
+    _, E_Neu, _ = sol_Neu.convergence_rates(cfl=1/np.sqrt(2), mx=3, my=3)
+    assert np.all(E_Dir < 1e-12), "l2-feilen for Dirichet er ikke tilstrekkelig liten!"
+    assert np.all(E_Neu < 1e-12), f"l2-feilen for Neumann er ikke tilstrekkelig liten!"
 
 if __name__ == '__main__':
-    # wave = Wave2D()
-    # data = wave(200, 4000, store_data=50)
-    # wave.animate()
-    test_convergence_wave2d()
+    wave = Wave2D()
+    wave = Wave2D_Neumann()
+    data = wave(80, 200, store_data=5)
+    wave.animate()
+    # test_convergence_wave2d()
+    # test_convergence_wave2d_neumann()
+    # test_exact_wave2d()
