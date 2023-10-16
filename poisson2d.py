@@ -29,7 +29,6 @@ class Poisson2D:
         self.L = L
         self.ue = ue
         self.f = sp.diff(self.ue, x, 2)+sp.diff(self.ue, y, 2)
-        # self.create_mesh()
 
     def create_mesh(self, N):
         """Create 2D mesh and store in self.xij and self.yij"""
@@ -38,7 +37,6 @@ class Poisson2D:
         x = np.linspace(0, self.L, N+1)
         y = np.linspace(0, self.L, N+1)
         self.xij, self.yij = np.meshgrid(x, y)
-        # raise NotImplementedError
 
     def D2(self):
         """Return second order differentiation matrix"""
@@ -47,13 +45,11 @@ class Poisson2D:
         D2[-1, -4:] = -1, 4, -5, 2
         D2 /= self.h**2
         return D2
-        # raise NotImplementedError
 
     def laplace(self):
         """Return vectorized Laplace operator"""
         laplace = sparse.kron(self.D2(), sparse.eye(self.N+1)) + sparse.kron(sparse.eye(self.N+1), self.D2())
         return laplace
-        # raise NotImplementedError
 
     def get_boundary_indices(self):
         """Return indices of vectorized matrix that belongs to the boundary"""
@@ -61,7 +57,6 @@ class Poisson2D:
         boundary[1:-1, 1:-1] = 0
         boundary_indcs = np.where(boundary.ravel() == 1)[0]
         return boundary_indcs
-        # raise NotImplementedError
 
     def assemble(self):
         """Return assembled matrix A and right hand side vector b"""
@@ -81,14 +76,12 @@ class Poisson2D:
         
         A = A.tocsr()
         return A, b
-        # raise NotImplementedError
 
     def l2_error(self, u):
         """Return l2-error norm"""
         ue = self.eval(self.xij, self.yij)
         l2_err = np.sqrt(np.trapz(np.trapz((u-ue)**2, dx=self.h, axis=1), dx=self.h))
         return l2_err
-        # raise NotImplementedError
 
     def __call__(self, N):
         """Solve Poisson's equation.
@@ -147,7 +140,6 @@ class Poisson2D:
         The value of u(x, y)
 
         """
-        # self
         return sp.lambdify((x, y), self.ue)(xi, yi)
 
 def test_convergence_poisson2d():
