@@ -4,6 +4,7 @@ import scipy.sparse as sparse
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.animation as animation
+from pathlib import Path
 
 x, y, t = sp.symbols('x,y,t')
 
@@ -20,20 +21,12 @@ class Wave2D:
     def D2(self, N):
         """Return second order differentiation matrix"""
         D2 = sparse.diags([1, -2, 1], [-1, 0, 1], (N+1, N+1), 'lil')
-
         return D2
 
     @property
     def w(self):
         """Return the dispersion coefficient"""
         w = self.c*np.pi*np.sqrt(self.mx**2 + self.my**2)
-        # print(self.c*np.pi*np.sqrt(self.mx**2 + self.my**2))
-
-        # kx = self.mx*np.pi
-        # ky = self.my*np.pi
-        # w = self.c*np.sqrt(kx**2 + ky**2)
-
-        # w = 1.443
         return w
     
     def ue(self, mx, my):
@@ -79,7 +72,6 @@ class Wave2D:
 
         err = np.sqrt(self.h**2*np.sum((u[:] - uet0[:])**2))
 
-        # print(f't: {t0:.3f}, error: {err:.3f}')
         return err
 
     def apply_bcs(self):
@@ -127,7 +119,6 @@ class Wave2D:
         self.Unp1 = np.zeros((N+1, N+1))
         err = []
 
-
         self.plotdata = {0: self.Unm1.copy()}
         self.plotdata[1]= self.Un.copy()
         for n in range(1, Nt+1):
@@ -147,7 +138,7 @@ class Wave2D:
         else:
             return self.plotdata
         
-    def animate(self):
+    def animate(self, filename="wave2d.gif"):
         frames = []
 
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
@@ -157,8 +148,7 @@ class Wave2D:
 
             frames.append([frame])
         ani = animation.ArtistAnimation(fig, frames, interval=150, blit=True,)
-        ani.save("wave2d.gif", writer='pillow')
-        plt.show()
+        ani.save(Path.cwd() / "report" / filename, writer='pillow')
 
     def convergence_rates(self, m=5, cfl=0.1, Nt=10, mx=3, my=3):
         """Compute convergence rates for a range of discretizations
@@ -208,19 +198,19 @@ class Wave2D_Neumann(Wave2D):
         return sp.cos(mx*sp.pi*x)*sp.cos(my*sp.pi*y)*sp.cos(self.w*t)
 
     def apply_bcs(self):
+        """ Apply boundary condition. """
+        # overload the apply_bcs method from the superclass,
+        # because Neumann bcs are baked into the stencil
         pass
 
 def test_convergence_wave2d():
     sol = Wave2D()
     r, E, h = sol.convergence_rates(mx=2, my=3)
-    print(r)
     assert abs(r[-1]-2) < 1e-2
 
 def test_convergence_wave2d_neumann():
     solN = Wave2D_Neumann()
     r, E, h = solN.convergence_rates(mx=2, my=3)
-    print(r)
-    print(E)
     assert abs(r[-1]-2) < 0.05
 
 def test_exact_wave2d():
@@ -232,10 +222,10 @@ def test_exact_wave2d():
     assert np.all(E_Neu < 1e-12), f"l2-feilen for Neumann er ikke tilstrekkelig liten!"
 
 if __name__ == '__main__':
-    wave = Wave2D()
+    # wave = Wave2D()
     wave = Wave2D_Neumann()
     data = wave(80, 200, store_data=5)
-    wave.animate()
-    # test_convergence_wave2d()
-    # test_convergence_wave2d_neumann()
-    # test_exact_wave2d()
+    wave.animate('neumannwave.gif')
+    test_convergence_wave2d()
+    test_convergence_wave2d_neumann()
+    test_exact_wave2d()
